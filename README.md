@@ -10,7 +10,7 @@ This project implements an intelligent AI agent using Pydantic AI to manage Gmai
 ## Key Features
 
 - **Smart Email Processing**: Processes starred emails with unread messages
-- **Draft Mode**: Creates draft replies for your review instead of sending automatically
+- ✅ **Draft Mode**: Creates draft replies for your review instead of sending automatically
 - **Conversation-Aware**: Identifies and responds to the most recent unread message in ongoing conversations
 - **Thread Intelligence**: Properly handles multi-message threads and conversation history
 - **Threaded Replies**: Replies are sent in the same thread as the original message for better conversation tracking
@@ -112,7 +112,7 @@ The agent will:
    - Remove the star after processing to prevent duplicate replies
 4. Ignore unwanted emails
 
-### Operation Modes
+### Operation Modes 🆕 
 
 The agent supports two operation modes, configurable via the `.env` file:
 
@@ -352,9 +352,9 @@ We're actively developing enhanced capabilities for the Gmail Pydantic AI Agent 
 - **Sentiment Analysis**: Detects the tone and emotion of incoming messages for more appropriate responses
 
 ### 2. Memory & Contextual Understanding
-- **Conversation Memory**: Maintains context across multiple email exchanges
-- **Entity Recognition**: Identifies and remembers important people, projects, and topics
-- **Relationship Tracking**: Builds a network of connections between correspondents and topics
+- ✅ **Conversation Memory**: Maintains context across multiple email exchanges
+- ✅ **Entity Recognition**: Identifies and remembers important people, projects, and topics
+- ✅ **Relationship Tracking**: Builds a network of connections between correspondents and topics
 
 ### 3. Knowledge Base Integration
 - **FAQ Integration**: Automatically answers common questions with consistent, accurate responses
