@@ -1,31 +1,42 @@
-from dataclasses import dataclass
-from typing import List, Optional
+# First import dotenv to load environment variables
+from dotenv import load_dotenv
 import os
+
+# Load environment variables before anything else
+load_dotenv()
+
+# Check if API key is set
+api_key = os.getenv("MY_OPENROUTER_API_KEY")
+if not api_key or api_key == "your_openrouter_api_key_here":
+    print("\nERROR: You need to set your OpenRouter API key in the .env file!")
+    print("Please edit the .env file and replace 'your_openrouter_api_key_here' with your actual API key.\n")
+
+# Import required modules
+from dataclasses import dataclass, field
+from typing import List, Optional, Dict, Any
 import httpx
 import base64
 import html
 import re
 from pydantic import BaseModel, Field
 from pydantic_ai import Agent, RunContext
-from pydantic_ai.models.openai import OpenAIModel
-from google.oauth2.credentials import Credentials
+from pydantic_ai.models.openai import OpenAIModel  # Correct import for OpenAIModel
+from google.oauth2.credentials import Credentials as GoogleCredentials
 from googleapiclient.discovery import build
 from google.auth.transport.requests import Request
-from dotenv import load_dotenv
 import time
 import aiohttp
 import json
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
-
-# Load environment variables from .env file
-load_dotenv()
-
+# Import MemoryIntegration from the local memory package
+from memory import MemoryIntegration
 # Gmail API Setup
 @dataclass
 class GmailDependencies:
-    credentials: Credentials
+    credentials: GoogleCredentials
     client: httpx.AsyncClient
+    memory: MemoryIntegration = field(default_factory=lambda: MemoryIntegration())
 
     async def get_gmail_service(self):
         """Get authenticated Gmail service instance"""
@@ -84,8 +95,18 @@ class OpenRouterAPI:
             print(f"Error calling OpenRouter API: {e}")
             return f"Error: {str(e)}"
 
-# Create the OpenRouter instance
-router_api = OpenRouterAPI(os.getenv("MY_OPENROUTER_API_KEY"))
+# Load environment variables before creating the OpenRouter instance
+api_key = os.getenv("MY_OPENROUTER_API_KEY")
+
+# Create the OpenRouter instance with explicit API key checking
+if api_key and api_key != "your_openrouter_api_key_here":
+    router_api = OpenRouterAPI(api_key)
+else:
+    # Create a mock API for testing that returns a placeholder message
+    class MockAPI:
+        async def generate_response(self, prompt):
+            return "[API KEY NOT SET] This is a placeholder response. Please set your OpenRouter API key in the .env file."
+    router_api = MockAPI()
 
 # Create a custom model class that extends OpenAIModel
 class OpenRouterModel(OpenAIModel):
@@ -133,8 +154,7 @@ class OpenRouterModel(OpenAIModel):
             print(f"Error calling OpenRouter API: {e}")
             return f"Error: {str(e)}"
 
-# Initialize the OpenRouter API
-router_api = OpenRouterAPI(os.getenv("MY_OPENROUTER_API_KEY"))
+# No need to initialize OpenRouter API again since we already did it above
 
 # Initialize the agent with a string model name
 gmail_agent = Agent(
@@ -150,7 +170,7 @@ gmail_agent = Agent(
     ),
     model_settings={
         "temperature": 0.7,
-        "max_tokens": 1500,  # Increased to allow for more detailed responses
+        "max_tokens": 1500,
         "base_url": "https://openrouter.ai/api/v1",  # Override with OpenRouter URL
         "api_key": os.getenv("MY_OPENROUTER_API_KEY")  # Use OpenRouter API key
     }
@@ -196,11 +216,42 @@ async def fetch_starred_emails(ctx: RunContext[GmailDependencies]) -> List[dict]
     
     return detailed_messages
 
+# Helper function to get sent messages
+@gmail_agent.tool
+async def get_sent_messages(ctx: RunContext[GmailDependencies], thread_id: str, max_results: int = 1) -> List[dict]:
+    """Get the most recent sent messages in a thread"""
+    service = await ctx.deps.get_gmail_service()
+    
+    # Query for sent messages in this thread
+    query = f"threadId:{thread_id} label:sent"
+    results = service.users().messages().list(
+        userId='me',
+        q=query,
+        maxResults=max_results
+    ).execute()
+    
+    messages = results.get('messages', [])
+    
+    # Fetch full details for each message
+    detailed_messages = []
+    for msg in messages:
+        full_msg = service.users().messages().get(
+            userId='me',
+            id=msg['id'],
+            format='full'
+        ).execute()
+        detailed_messages.append(full_msg)
+    
+    return detailed_messages
+
 # Tool to generate a reply for an email
 @gmail_agent.tool
-async def generate_reply(ctx: RunContext[GmailDependencies], email_content: str) -> str:
-    return await ctx.model(
-        f"""You are Sofia, a helpful and professional assistant. You're responding to an email from a user.
+async def generate_reply(ctx: RunContext[GmailDependencies], email_content: str, thread_id: str) -> str:
+    # Get memory context for this thread
+    memory_context = ctx.deps.memory.get_memory_context(thread_id)
+    
+    # Use our API directly rather than ctx.model
+    prompt = f"""You are Sofia, a helpful and professional assistant. You're responding to an email from a user.
         
 Your responses should be:
 - Comprehensive and detailed (at least 3-5 sentences for most emails)
@@ -217,15 +268,103 @@ When responding:
 5. Use appropriate greetings and sign-offs based on the formality of the original email
 6. If the email is in a language other than English, respond in that same language
 
+CONVERSATION CONTEXT AND MEMORY:
+{memory_context}
+
 Here is the email to respond to:
 {email_content}
 
-Write a complete, helpful response as Sofia:"""
-    )
+Write a complete, helpful response as Sofia that references relevant past conversations and shows understanding of the people and projects mentioned:"""
+    
+    # Use the API directly via the model method
+    if hasattr(ctx, 'api') and ctx.api:
+        return await ctx.api.generate_response(prompt)
+    elif hasattr(ctx, 'model') and callable(ctx.model):
+        return await ctx.model(prompt)
+    else:
+        raise ValueError("No API or model available to generate a response")
+
+# Tool to create a draft reply instead of sending immediately
+@gmail_agent.tool
+async def create_reply_draft(ctx: RunContext[GmailDependencies], message_id: str, reply_content: str) -> bool:
+    """Create a draft reply instead of sending it immediately"""
+    service = await ctx.deps.get_gmail_service()
+    
+    # Get the original message to extract headers and thread ID for reply
+    original_message = service.users().messages().get(userId='me', id=message_id).execute()
+    thread_id = original_message.get('threadId')
+    
+    # Get the recipient email and subject
+    to_email = None
+    subject = "Re: Email"
+    from_email = None
+    message_id_header = None
+    references_header = None
+    in_reply_to_header = None
+    
+    headers = original_message.get('payload', {}).get('headers', [])
+    for header in headers:
+        header_name = header.get('name', '').lower()
+        if header_name == 'from':
+            from_email = header.get('value', '')
+        elif header_name == 'to':
+            # This is who the original message was sent to (likely the user's email)
+            user_email = header.get('value', '')
+        elif header_name == 'subject':
+            # Don't add another "Re:" if it already has one
+            subject_value = header.get('value', 'Email')
+            if subject_value.lower().startswith('re:'):
+                subject = subject_value
+            else:
+                subject = f"Re: {subject_value}"
+        elif header_name == 'message-id':
+            message_id_header = header.get('value', '')
+        elif header_name == 'references':
+            references_header = header.get('value', '')
+        elif header_name == 'in-reply-to':
+            in_reply_to_header = header.get('value', '')
+    
+    # For messages sent by the user (SENT label), we need to use the 'To' field as recipient
+    # For messages received by the user, we use the 'From' field as recipient
+    labels = original_message.get('labelIds', [])
+    if 'SENT' in labels:
+        # This is a message sent by the user, so reply to the recipient of the original message
+        print(f"Message {message_id} has SENT label, extracting recipient from 'To' header")
+        
+        # Re-examine headers to find the 'To' field
+        for header in headers:
+            if header.get('name', '').lower() == 'to':
+                to_email = header.get('value', '')
+                break
+    else:
+        # This is a message received by the user, so reply to the sender
+        to_email = from_email
+    
+    print(f"Creating draft reply to: {to_email}")
+    
+    if not to_email:
+        print(f"Could not find recipient email for message {message_id}")
+        return False
+    
+    # Create properly formatted email with threading headers
+    raw_message = create_email_reply(to_email, subject, reply_content, thread_id, message_id_header, references_header, in_reply_to_header)
+    
+    # Create a draft email in the same thread instead of sending immediately
+    draft = {
+        'message': {
+            'raw': raw_message,
+            'threadId': thread_id
+        }
+    }
+    
+    draft = service.users().drafts().create(userId='me', body=draft).execute()
+    print(f"Draft created in thread: {thread_id}")
+    return True
 
 # Tool to send a reply email
 @gmail_agent.tool
 async def send_reply(ctx: RunContext[GmailDependencies], message_id: str, reply_content: str) -> bool:
+    """Send a reply email directly"""
     service = await ctx.deps.get_gmail_service()
     
     # Get the original message to extract headers and thread ID for reply
@@ -394,6 +533,13 @@ class DummyRunContext(RunContext[GmailDependencies]):
     def __init__(self, deps: GmailDependencies, api=None):
         self.deps = deps
         self.api = api
+        self.model = api
+        self.prompt = "Gmail Assistant"
+        self.usage = None
+        self.messages = []
+        self.run_step = 0
+        self.retry = 0
+        self.tool_name = None
         
     async def model(self, prompt: str, **kwargs) -> str:
         if self.api:
@@ -545,9 +691,59 @@ async def has_been_replied_to_by_agent(ctx: RunContext[GmailDependencies], messa
         print(f"Error checking if email ID {message_id} has been replied to by the agent: {e}")
         return False
 
+# Helper functions for processing emails
+async def is_message_from_agent(message):
+    """Check if a message is from the agent"""
+    headers = message.get('payload', {}).get('headers', [])
+    for header in headers:
+        if header.get('name', '').lower() == 'from':
+            from_value = header.get('value', '').lower()
+            if 'me@' in from_value or 'your.email@' in from_value or 'sofia' in from_value:
+                return True
+    return False
+
+async def has_unread_messages(message):
+    """Check if a message has the UNREAD label"""
+    labels = message.get('labelIds', [])
+    return 'UNREAD' in labels
+
+async def find_message_to_respond(ctx: RunContext[GmailDependencies], thread_id: str):
+    """Find the most recent unread message in a thread"""
+    service = await ctx.deps.get_gmail_service()
+    thread = service.users().threads().get(userId='me', id=thread_id).execute()
+    messages = thread.get('messages', [])
+    
+    # Sort messages by internalDate (newest first)
+    messages.sort(key=lambda x: int(x.get('internalDate', 0)), reverse=True)
+    
+    for message in messages:
+        labels = message.get('labelIds', [])
+        if 'UNREAD' in labels:
+            # Get the full message
+            full_message = service.users().messages().get(
+                userId='me',
+                id=message['id'],
+                format='full'
+            ).execute()
+            return full_message
+    
+    return None
+
+async def remove_star(ctx: RunContext[GmailDependencies], message_id: str):
+    """Remove the star from an email"""
+    return await remove_star_from_email(ctx, message_id)
+
 # Main execution
 async def main():
-    # Use the token path from environment variable and make it absolute
+    """Main function to process emails"""
+    # Check if we have a valid API key
+    api_key = os.getenv("MY_OPENROUTER_API_KEY")
+    if not api_key or api_key == "your_openrouter_api_key_here":
+        print("\n---------------------------------------")
+        print("WARNING: No valid OpenRouter API key found!")
+        print("The app will run with placeholder responses.")
+        print("Please set your API key in the .env file.")
+        print("---------------------------------------\n")
     token_path = os.getenv('GMAIL_TOKEN_PATH', 'token.json')
     current_dir = os.path.dirname(os.path.abspath(__file__))
     absolute_token_path = os.path.join(current_dir, token_path)
@@ -558,19 +754,25 @@ async def main():
     if not os.path.exists(absolute_token_path):
         raise FileNotFoundError(f"Token file not found at {absolute_token_path}. Please make sure token.json exists in this location.")
     
-    creds = Credentials.from_authorized_user_file(absolute_token_path)
+    creds = GoogleCredentials.from_authorized_user_file(absolute_token_path)
     
     async with httpx.AsyncClient() as client:
-        deps = GmailDependencies(credentials=creds, client=client)
-        ctx = DummyRunContext(deps, router_api)
+        # Initialize memory system
+        memory = MemoryIntegration()
+        deps = GmailDependencies(credentials=creds, client=client, memory=memory)
+        
+        # Use the DummyRunContext we defined earlier instead of RunContext directly
+        ctx = DummyRunContext(deps=deps, api=router_api)
         
         # Process starred emails
         starred_emails = await fetch_starred_emails(ctx)
         print(f"Found {len(starred_emails)} starred emails")
         sent_replies = 0
+        processed_count = 0
         
         for email in starred_emails:
             email_id = email['id']
+            thread_id = email.get('threadId', '')
             print(f"Processing email ID: {email_id}")
             
             # Get the latest message in the thread and determine if it should be processed
@@ -581,70 +783,57 @@ async def main():
             
             latest_message_id = latest_message['id']
             
+            # Store message in memory system
+            memory.process_email(latest_message, is_from_agent=False)
+            
             # Skip if the message should not be processed
             if not should_process:
                 print(f"Message (ID: {latest_message_id}) should not be processed; skipping.")
-                continue
-            
-            # Check if the latest message has already been replied to by the agent
-            if await has_been_replied_to_by_agent(ctx, latest_message_id):
-                print(f"Latest message in thread (ID: {latest_message_id}) has already been replied to by the agent; removing star and skipping.")
                 await remove_star_from_email(ctx, email_id)
                 continue
             
+            # Extract email content using the helper function
+            email_content = extract_email_content(latest_message)
+            
+            if not email_content:
+                print(f"Email ID {email_id} has no content; skipping reply generation.")
+                await remove_star_from_email(ctx, email_id)
+                continue
+            
+            # Generate and send reply
+            print(f"Email content: {email_content[:100]}...")  # Print first 100 chars
             try:
-                # Extract email content using the helper function
-                email_content = extract_email_content(latest_message)
+                # Generate reply with memory context
+                reply = await generate_reply(ctx, email_content, thread_id)
+                print(f"Generated reply: {reply[:100]}...")  # Print first 100 chars
                 
-                if not email_content:
-                    print(f"Email ID {email_id} has no content; skipping reply generation.")
-                    continue
+                # Get the operation mode from environment variables
+                operation_mode = os.getenv('OPERATION_MODE', 'draft').lower()
                 
-                # Generate and send reply with timeout
-                print(f"Email content: {email_content[:100]}...")  # Print first 100 chars
-                start_time = time.time()
-                try:
-                    gpt_start = time.time()
-                    # Call the router_api directly with an enhanced prompt
-                    reply = await asyncio.wait_for(router_api.generate_response(
-                        f"""You are Sofia, a helpful and professional assistant. You're responding to an email from a user.
-                        
-Your responses should be:
-- Comprehensive and detailed (at least 3-5 sentences for most emails)
-- Warm, friendly, and positive in tone
-- Professional but conversational
-- Helpful and solution-oriented
-- Written in the same language as the original email (e.g., Italian, Spanish, English)
-
-When responding:
-1. If it's a question, provide a thorough answer with examples or steps when relevant
-2. If it's a request, acknowledge it clearly and provide next steps or confirmation
-3. If it's a statement or update, acknowledge the information and respond appropriately
-4. Always maintain a positive, supportive tone even when addressing problems
-5. Use appropriate greetings and sign-offs based on the formality of the original email
-6. If the email is in a language other than English, respond in that same language
-
-Here is the email to respond to:
-{email_content}
-
-Write a complete, helpful response as Sofia:"""
-                    ), timeout=60)
-                    gpt_end = time.time()
-                    print(f"GPT API call took {gpt_end - gpt_start:.2f} seconds")
-                    print(f"Generated reply: {reply[:100]}...")  # Print first 100 chars of reply
-                    
-                    # Send the reply to the latest message
-                    await send_reply(ctx, latest_message_id, reply)
+                # Either create a draft or send reply based on operation mode
+                if operation_mode == 'auto':
+                    print("Operating in AUTO mode: sending reply directly")
+                    success = await send_reply(ctx, latest_message_id, reply)
+                    action_description = "Reply sent"
+                else:  # default to draft mode
+                    print("Operating in DRAFT mode: creating draft for review")
+                    success = await create_reply_draft(ctx, latest_message_id, reply)
+                    action_description = "Draft created"
+                
+                if success:
                     sent_replies += 1
-                    print(f"Reply sent to latest message ID: {latest_message_id}")
+                    print(f"{action_description} for message ID: {latest_message_id}")
                     
-                    # Always remove the star after processing to prevent duplicate replies
-                    # We'll add a more sophisticated tracking mechanism for conversations
-                    await remove_star_from_email(ctx, email_id)
-                    print(f"Removed star from email ID: {email_id} after processing")
-                except asyncio.TimeoutError:
-                    print(f"Timeout while generating reply for email {email_id}")
-                    continue
+                    # Get our sent message and add it to memory
+                    sent_messages = await get_sent_messages(ctx, thread_id, 1)
+                    if sent_messages:
+                        memory.process_email(sent_messages[0], is_from_agent=True)
+                    
+                # Always remove the star after processing to prevent duplicate replies
+                await remove_star_from_email(ctx, email_id)
+                print(f"Removed star from email ID: {email_id} after processing")
+                
+                processed_count += 1
             except Exception as e:
                 print(f"Error processing email ID {email_id}: {e}")
                 continue
@@ -654,7 +843,7 @@ Write a complete, helpful response as Sofia:"""
         print(f"Cleaned {cleaned_count} emails")
         
         result = GmailResult(
-            processed_emails=len(starred_emails),
+            processed_emails=processed_count,
             sent_replies=sent_replies,
             cleaned_emails=cleaned_count
         )

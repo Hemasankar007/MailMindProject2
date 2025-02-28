@@ -10,6 +10,7 @@ This project implements an intelligent AI agent using Pydantic AI to manage Gmai
 ## Key Features
 
 - **Smart Email Processing**: Processes starred emails with unread messages
+- **Draft Mode**: Creates draft replies for your review instead of sending automatically
 - **Conversation-Aware**: Identifies and responds to the most recent unread message in ongoing conversations
 - **Thread Intelligence**: Properly handles multi-message threads and conversation history
 - **Threaded Replies**: Replies are sent in the same thread as the original message for better conversation tracking
@@ -35,6 +36,11 @@ curl -o .env .env.example
    - Replace the placeholder with your actual API key:
 ```bash
 MY_OPENROUTER_API_KEY=your_openrouter_api_key_here
+```
+   - Configure operation mode (draft by default):
+```bash
+# Options: 'auto' (send automatically), 'draft' (create drafts for review)
+OPERATION_MODE=draft
 ```
 
 ### Setting Up Google OAuth Credentials
@@ -102,9 +108,23 @@ The agent will:
    - Skip if there are no unread messages in the thread
    - Find the most recent unread message to respond to
    - Generate a detailed, helpful reply in the same language as the original message
-   - Send the reply to the appropriate recipient (handles both incoming and outgoing emails)
+   - Create a draft or send the reply based on the OPERATION_MODE setting
    - Remove the star after processing to prevent duplicate replies
 4. Ignore unwanted emails
+
+### Operation Modes
+
+The agent supports two operation modes, configurable via the `.env` file:
+
+1. **Draft Mode** (Default): Creates draft emails for your review
+   - Ideal for reviewing AI-generated replies before sending
+   - Allows you to make edits or discard inappropriate responses
+   - Set `OPERATION_MODE=draft` in your `.env` file
+
+2. **Auto Mode**: Sends replies automatically without review
+   - Useful for fully automated email management
+   - Best for low-stakes email replies or when you fully trust the AI
+   - Set `OPERATION_MODE=auto` in your `.env` file
 
 ## Workflow
 
@@ -123,6 +143,7 @@ The agent can be scheduled to run regularly:
 - Set it to run at your preferred time
 
 You can customize the agent's behavior:
+- Set `OPERATION_MODE=draft` or `OPERATION_MODE=auto` in your `.env` file
 - Change the AI model in the `OpenRouterAPI` class (currently using "google/gemini-2.0-flash-001")
 - Modify the system prompt in the `Agent` initialization
 - Adjust the reply generation prompt in the main function
