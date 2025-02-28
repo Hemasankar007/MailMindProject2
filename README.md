@@ -37,26 +37,48 @@ curl -o .env .env.example
 MY_OPENROUTER_API_KEY=your_openrouter_api_key_here
 ```
 
-3. Obtain Gmail OAuth tokens:
-   - Create a Python script `get_tokens.py` with:
-```python
-from google_auth_oauthlib.flow import InstalledAppFlow
+### Setting Up Google OAuth Credentials
 
-SCOPES = ['https://www.googleapis.com/auth/gmail.modify']
+To enable Gmail API access, you'll need to set up OAuth credentials through Google Cloud Console:
 
-def get_credentials():
-    flow = InstalledAppFlow.from_client_secrets_file(
-        'credentials.json',
-        SCOPES)
-    creds = flow.run_local_server(port=0)
-    return creds
+1. **Create a Google Cloud Project**:
+   - Go to [Google Cloud Console](https://console.cloud.google.com/)
+   - Click "Create Project"
+   - Give your project a name and click "Create"
 
-if __name__ == '__main__':
-    credentials = get_credentials()
-    with open('token.json', 'w') as token:
-        token.write(credentials.to_json())
+2. **Enable Gmail API**:
+   - In the left sidebar, go to "APIs & Services" → "Library"
+   - Search for "Gmail API" and click on it
+   - Click "Enable"
+
+3. **Configure OAuth Consent Screen**:
+   - Go to "APIs & Services" → "OAuth consent screen"
+   - Select "External" and click "Create"
+   - Fill in the required app information:
+     - App name: Your application name
+     - User support email: Your email address
+     - Developer contact information: Your email address
+   - Click "Save and Continue"
+   - Add any required scopes (you can skip this for now)
+   - Add test users (add your own email address)
+   - Click "Save and Continue"
+
+4. **Create OAuth Credentials**:
+   - Go to "APIs & Services" → "Credentials"
+   - Click "Create Credentials" → "OAuth client ID"
+   - Select "Desktop app" as the application type
+   - Give it a name and click "Create"
+   - Download the credentials file and save it as `credentials.json` in your project directory
+
+5. **Authorize Your Application**:
+   - Run the provided `get_tokens.py` script:
+```bash
+python get_tokens.py
 ```
-   - Download your OAuth credentials from Google Cloud Console as `credentials.json`
+   - Follow the authorization flow in your browser
+   - The tokens will be saved to `token.json`
+
+3. Obtain Gmail OAuth tokens:
    - Run the script:
 ```bash
 python get_tokens.py
