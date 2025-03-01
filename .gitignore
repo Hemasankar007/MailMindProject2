@@ -26,3 +26,4 @@ env/
 
 # Logs
 *.log
+credentials.json

@@ -84,14 +84,6 @@ python get_tokens.py
    - Follow the authorization flow in your browser
    - The tokens will be saved to `token.json`
 
-3. Obtain Gmail OAuth tokens:
-   - Run the script:
-```bash
-python get_tokens.py
-```
-   - Follow the authorization flow in your browser
-   - The tokens will be saved to `token.json`
-
 ## Usage
 
 Run the agent:
