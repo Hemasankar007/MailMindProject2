@@ -1,8 +1,11 @@
 # Environment variables
 .env
+#Conversations
+memory/conversation_memory.json
 
 # Credentials
 token.json
+credentials.json
 
 # Python cache files
 __pycache__/
@@ -26,4 +29,3 @@ env/
 
 # Logs
 *.log
-credentials.json
