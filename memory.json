@@ -1,0 +1,70 @@
+{
+  "processed_emails": {
+    "198c7c579f574b74": {
+      "processed_at": "2025-08-20T22:36:46.453595",
+      "thread_id": "198c7c579f574b74"
+    },
+    "198ca7d1f24dde4e": {
+      "processed_at": "2025-08-21T11:03:50.589329",
+      "thread_id": "198ca7d1f24dde4e"
+    },
+    "198cade491c1beb4": {
+      "processed_at": "2025-08-21T11:06:17.733233",
+      "thread_id": "198cade491c1beb4"
+    },
+    "198c8437d778616e": {
+      "processed_at": "2025-08-21T13:02:32.324375",
+      "thread_id": "198c8437d778616e"
+    },
+    "198c56e1c964957a": {
+      "processed_at": "2025-08-21T13:15:16.460448",
+      "thread_id": "198c56e1c964957a"
+    },
+    "198acb6e0452fb6a": {
+      "processed_at": "2025-08-21T14:25:26.533780",
+      "thread_id": "198acb6e0452fb6a"
+    },
+    "198c7ce749d03a47": {
+      "processed_at": "2025-08-21T15:34:24.588410",
+      "thread_id": "198c7ce749d03a47"
+    }
+  },
+  "conversations": {
+    "198c7c579f574b74": {
+      "topic": "general inquiry",
+      "last_interaction": "2025-08-20T22:36:46.457060",
+      "last_email_snippet": "Subject: Security alert\n\n[image: Google] You allowed MyMail Assistant access to some of your Google ..."
+    },
+    "198ca7d1f24dde4e": {
+      "topic": "general inquiry",
+      "last_interaction": "2025-08-21T11:03:50.590626",
+      "last_email_snippet": "Subject: They make fun of me for repeating outfits at work?\n\n"
+    },
+    "198cade491c1beb4": {
+      "topic": "general inquiry",
+      "last_interaction": "2025-08-21T11:06:17.736402",
+      "last_email_snippet": "Subject: Security alert\n\n[image: Google] You allowed MyMail Assistant access to some of your Google ..."
+    },
+    "198c8437d778616e": {
+      "topic": "general inquiry",
+      "last_interaction": "2025-08-21T13:02:32.327742",
+      "last_email_snippet": "Subject: Welcome to CodeGPT!\n\nHi there, Welcome to CodeGPT ! Your Free BYOK (Bring Your Own Key) pla..."
+    },
+    "198c56e1c964957a": {
+      "topic": "general inquiry",
+      "last_interaction": "2025-08-21T13:15:16.461489",
+      "last_email_snippet": "Subject: Hare Krishna! Your donation is successful to ISKCON Attapur on 20/08/2025\n\n"
+    },
+    "198acb6e0452fb6a": {
+      "topic": "general inquiry",
+      "last_interaction": "2025-08-21T14:25:26.540459",
+      "last_email_snippet": "Subject: naukri campus : Last few days to enroll for Quiz\n\n"
+    },
+    "198c7ce749d03a47": {
+      "topic": "questions",
+      "last_interaction": "2025-08-21T15:34:24.589938",
+      "last_email_snippet": "Subject: 100+ Quantitative Aptitude Questions - Answers and Explanations\n\n"
+    }
+  },
+  "entities": {}
+}
