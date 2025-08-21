@@ -1,5 +1,5 @@
 import os
-os.environ["NUMPY_EXPERIMENTAL_ARRAY_FUNCTION"] = "0"
+
 import warnings
 warnings.filterwarnings("ignore", category=RuntimeWarning)
 
