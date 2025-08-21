@@ -128,9 +128,9 @@ The agent supports two operation modes, configurable via the `.env` file:
    - Star the conversation again if you want the agent to respond to new messages
    - The agent will only respond to unread messages, preventing duplicate replies
 
-![alt text](image.png)
 ![alt text](image-1.png)
 ![alt text](image-2.png)
+![alt text](image.png)
 ## Configuration
 
 The agent can be scheduled to run regularly:
