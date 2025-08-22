@@ -1,5 +1,5 @@
 import os
-
+import logging
 import warnings
 warnings.filterwarnings("ignore", category=RuntimeWarning)
 
@@ -12,6 +12,7 @@ from auth_service import GmailAuthService
 from gmail_service import GmailService
 from ai_service import AIService
 from memory_service import MemoryService
+from logging_service import setup_logging
 
 # Page configuration
 st.set_page_config(
@@ -33,6 +34,8 @@ def init_services():
         return None, None, None, str(e)
 
 def main():
+    setup_logging()
+    logging.info("Application started.")
     st.title("✉️ Gmail AI Agent")
     st.markdown("Process and respond to emails based on time intervals")
     
@@ -104,6 +107,7 @@ def main():
         if st.button("📥 Fetch Emails"):
             with st.spinner("Fetching and analyzing emails..."):
                 try:
+                    logging.info(f"Fetching emails with filter type: {filter_type}")
                     if filter_type == "Starred emails":
                         emails = gmail_service.get_starred_emails(selected_label)
                     elif filter_type == "Date Range":
@@ -111,6 +115,7 @@ def main():
                     
                     if emails:
                         st.session_state.emails = emails
+                        logging.info(f"Found {len(emails)} emails.")
                         
                         email_analysis_results = []
                         for email_obj in emails:
@@ -128,11 +133,14 @@ def main():
                         
                         st.session_state.email_analysis = email_analysis_results
                         st.success(f"Found and analyzed {len(emails)} emails.")
+                        logging.info(f"Successfully analyzed {len(emails)} emails.")
                     else:
                         st.info("No emails found for the selected criteria.")
+                        logging.info("No emails found for the selected criteria.")
                         
                 except Exception as e:
                     st.error(f"Error fetching or analyzing emails: {e}")
+                    logging.error(f"Error fetching or analyzing emails: {e}", exc_info=True)
         
         if 'email_analysis' in st.session_state:
             st.subheader(f"Emails to Process ({len(st.session_state.email_analysis)})")
@@ -170,6 +178,7 @@ def main():
                         
                         if st.button("Create Draft", key=f"draft_{i}"):
                             try:
+                                logging.info(f"Creating draft for email: {analysis['subject']}")
                                 success = gmail_service.create_draft_reply(email, response)
                                 if success:
                                     thread_id = email.get('threadId')
@@ -177,10 +186,13 @@ def main():
                                     if thread_id:
                                         memory_service.update_conversation(thread_id, content, response)
                                     st.success("Draft created successfully!")
+                                    logging.info(f"Draft created successfully for email: {analysis['subject']}")
                                 else:
                                     st.error("Failed to create draft")
+                                    logging.error(f"Failed to create draft for email: {analysis['subject']}")
                             except Exception as e:
                                 st.error(f"Error creating draft: {e}")
+                                logging.error(f"Error creating draft for email: {analysis['subject']}: {e}", exc_info=True)
 
     with tab2:
         st.header("Settings")
